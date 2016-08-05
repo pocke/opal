@@ -674,6 +674,7 @@
 
     // initialize dependency tracking
     module.$$included_in = [];
+    module.$$prepended_to = [];
 
     // Set the display name of the singleton prototype holder
     module_constructor.displayName = "#<Class:#<Module:"+module.$$id+">>"
@@ -945,45 +946,83 @@
   // the required method.
   //
   // @param module [Module] the module to include
-  // @param klass  [Class] the target class to include module into
+  // @param includer [Module] the target class to include module into
   // @return [null]
-  Opal.append_features = function(module, klass) {
-    var iclass, donator, prototype, methods, id, i;
+  Opal.append_features = function(module, includer) {
+    var iclass, methods, id, i;
 
     // check if this module is already included in the class
-    for (i = klass.$$inc.length - 1; i >= 0; i--) {
-      if (klass.$$inc[i] === module) {
+    for (i = includer.$$inc.length - 1; i >= 0; i--) {
+      if (includer.$$inc[i] === module) {
         return;
       }
     }
 
     // Check that the base module is not also a dependency, classes can't be
     // dependencies so we have a special case for them.
-    if (!klass.$$is_class && Opal.has_cyclic_dep(klass.$$id, [module], '$$inc', {})) {
+    if (!includer.$$is_class && Opal.has_cyclic_dep(includer.$$id, [module], '$$inc', {})) {
       throw Opal.ArgumentError.$new('cyclic include detected')
     }
 
-    klass.$$inc.push(module);
-    module.$$included_in.push(klass);
-    Opal._bridge(klass, module);
+    includer.$$inc.push(module);
+    module.$$included_in.push(includer);
+    Opal._bridge(includer, module);
 
     iclass = {
       $$name:   module.$$name,
       $$proto:  module.$$proto,
-      $$parent: klass.$$parent,
+      $$parent: includer.$$parent,
       $$module: module,
       $$iclass: true
     };
 
-    klass.$$parent = iclass;
+    includer.$$parent = iclass;
 
     methods = module.$instance_methods();
 
     for (i = methods.length - 1; i >= 0; i--) {
-      Opal.update_includer(module, klass, '$' + methods[i])
+      Opal.update_method_cache(module, includer, '$' + methods[i])
     }
 
-    Opal.donate_constants(module, klass);
+    Opal.donate_constants(module, includer);
+  };
+
+  // The actual "prepension" of a module to a class.
+  //
+  // @param module [Module] the module to prepend
+  // @param prepender [Module] the target class/module to prepend module to
+  // @return [null]
+  Opal.prepend_features = function(module, prepender) {
+    var iclass, methods, id, i;
+
+    // check if this module is already included in the class
+    for (i = prepender.$$pre.length - 1; i >= 0; i--) {
+      if (prepender.$$pre[i] === module) {
+        return;
+      }
+    }
+
+    prepender.$$pre.push(module);
+    module.$$prepended_to.push(prepender);
+    Opal._bridge(prepender, module);
+
+    // iclass = {
+    //   $$name:   module.$$name,
+    //   $$proto:  module.$$proto,
+    //   $$parent: prepender.$$parent,
+    //   $$module: module,
+    //   $$iclass: true
+    // };
+    //
+    // prepender.$$parent = iclass;
+
+    methods = Object.keys(module.$$methods);
+
+    for (i = methods.length - 1; i >= 0; i--) {
+      Opal.update_method_cache(module, prepender, methods[i])
+    }
+
+    Opal.donate_constants(module, prepender);
   };
 
   // Table that holds all methods that have been defined on all objects
@@ -1083,7 +1122,7 @@
   };
 
   // Update `jsid` method cache of all classes / modules including `module`.
-  Opal.update_includer = function(module, includer, jsid) {
+  Opal.update_method_cache = function(module, includer, jsid) {
     // var dest    = includer.$$proto;
     var found_body = Opal.find_method_body(includer, jsid);
 
@@ -1157,12 +1196,12 @@
 
     // if the includer is a module, recursively update all of its includres.
     if (includer.$$included_in) {
-      Opal.update_includers(includer, jsid);
+      Opal.update_method_caches(includer, jsid);
     }
   };
 
   // Update `jsid` method cache of all classes / modules including `module`.
-  Opal.update_includers = function(module, jsid) {
+  Opal.update_method_caches = function(module, jsid) {
     var i, ii, includee, included_in;
 
     included_in = module.$$included_in;
@@ -1173,7 +1212,7 @@
 
     for (i = 0, ii = included_in.length; i < ii; i++) {
       includee = included_in[i];
-      Opal.update_includer(module, includee, jsid);
+      Opal.update_method_cache(module, includee, jsid);
     }
   };
 
@@ -1778,7 +1817,7 @@
 
     // is it a module?
     if (obj.$$is_module) {
-      Opal.update_includers(obj, jsid);
+      Opal.update_method_caches(obj, jsid);
 
       if (obj.$$module_function) {
         Opal.defs(obj, jsid, body);
