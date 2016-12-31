@@ -539,7 +539,7 @@
     module.$$name = nil;
 
     // @property $$cvars class variables defined in the current module
-    module.$$cvars = {};
+    module.$$cvars = Object.create(null);
   }
 
 
@@ -836,7 +836,7 @@
     for (i = length - 2; i >= 0; i--) {
       var ancestor = ancestors[i];
 
-      if (ancestor.$$cvars.hasOwnProperty(name)) {
+      if ($hasOwn.call(ancestor.$$cvars, name)) {
         ancestor.$$cvars[name] = value;
         return value;
       }
@@ -1366,7 +1366,7 @@
     var inspect = "`block in " + context + "'";
 
     throw Opal.ArgumentError.$new(inspect + ': wrong number of arguments (' + actual + ' for ' + expected + ')');
-  }
+  };
 
   // Super dispatcher
   Opal.find_super_dispatcher = function(obj, mid, current_func, defcheck, defs) {
@@ -1955,8 +1955,8 @@
   // ------
 
   Opal.hash_init = function(hash) {
-    hash.$$smap = {};
-    hash.$$map  = {};
+    hash.$$smap = Object.create(null);
+    hash.$$map  = Object.create(null);
     hash.$$keys = [];
   };
 
@@ -1980,7 +1980,7 @@
 
   Opal.hash_put = function(hash, key, value) {
     if (key.$$is_string) {
-      if (!hash.$$smap.hasOwnProperty(key)) {
+      if (!$hasOwn.call(hash.$$smap, key)) {
         hash.$$keys.push(key);
       }
       hash.$$smap[key] = value;
@@ -1989,7 +1989,7 @@
 
     var key_hash = key.$hash(), bucket, last_bucket;
 
-    if (!hash.$$map.hasOwnProperty(key_hash)) {
+    if (!$hasOwn.call(hash.$$map, key_hash)) {
       bucket = {key: key, key_hash: key_hash, value: value};
       hash.$$keys.push(bucket);
       hash.$$map[key_hash] = bucket;
@@ -2017,7 +2017,7 @@
 
   Opal.hash_get = function(hash, key) {
     if (key.$$is_string) {
-      if (hash.$$smap.hasOwnProperty(key)) {
+      if ($hasOwn.call(hash.$$smap, key)) {
         return hash.$$smap[key];
       }
       return;
@@ -2025,7 +2025,7 @@
 
     var key_hash = key.$hash(), bucket;
 
-    if (hash.$$map.hasOwnProperty(key_hash)) {
+    if ($hasOwn.call(hash.$$map, key_hash)) {
       bucket = hash.$$map[key_hash];
 
       while (bucket) {
@@ -2041,7 +2041,7 @@
     var i, keys = hash.$$keys, length = keys.length, value;
 
     if (key.$$is_string) {
-      if (!hash.$$smap.hasOwnProperty(key)) {
+      if (!$hasOwn.call(hash.$$smap, key)) {
         return;
       }
 
@@ -2059,7 +2059,7 @@
 
     var key_hash = key.$hash();
 
-    if (!hash.$$map.hasOwnProperty(key_hash)) {
+    if (!$hasOwn.call(hash.$$map, key_hash)) {
       return;
     }
 
@@ -2134,7 +2134,7 @@
 
       hash.$$keys[i].key_hash = key_hash;
 
-      if (!hash.$$map.hasOwnProperty(key_hash)) {
+      if (!$hasOwn.call(hash.$$map, key_hash)) {
         hash.$$map[key_hash] = hash.$$keys[i];
         continue;
       }
@@ -2221,7 +2221,7 @@
     var hash = new Opal.Hash.$$alloc();
 
     hash.$$smap = smap;
-    hash.$$map  = {};
+    hash.$$map  = Object.create(null);
     hash.$$keys = keys;
 
     return hash;
